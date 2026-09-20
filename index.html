@@ -12,29 +12,34 @@
   .layer { position:absolute; top:0; left:0; width:1920px; height:1080px; pointer-events:none; z-index:1; }
   .sprite { position:absolute; user-select:none; -webkit-user-drag:none; pointer-events:auto; z-index:1; }
 
-  .menubar { position:absolute; top:0; left:0; width:1920px; height:95px; z-index:500; cursor:pointer; pointer-events:auto; background:#021427; }
+  .menubar { position:absolute; top:0; left:0; width:1920px; height:95px; z-index:500; pointer-events:none; background:#021427; }
+  /* only the shell icon + "Menu" text area on the left opens the dropdown, not the whole bar */
+  .menubutton { position:absolute; top:0; left:0; width:280px; height:95px; z-index:505; cursor:pointer; pointer-events:auto; }
   .menudropdown { position:absolute; top:0; left:0; width:1920px; height:1080px; z-index:600; }
-  /* positions measured off menu_drop_down.png */
-  .hotspot { position:absolute; width:363px; height:77px; cursor:pointer; left:1542px; }
+  /* positions measured off menu_drop_down.svg */
+  .hotspot { position:absolute; width:364px; height:78px; cursor:pointer; left:29px; }
   .hotspot-home   { top:110px; }
-  .hotspot-game   { top:214px; }
+  .hotspot-game   { top:213px; }
   .hotspot-credit { top:316px; }
 
   #hud { position:absolute; top:0; left:0; width:1920px; height:95px; z-index:510; display:none; pointer-events:none; }
   .navlabel {
-    position:absolute; top:14px; left:40px; z-index:510; pointer-events:none;
-    font-family:'Apotek','Alata',Arial,sans-serif; font-size:46px; color:#C9F2EE; display:none;
+    position:absolute; top:14px; right:40px; z-index:510; pointer-events:none;
+    font-family:'Apotek Wide','Apotek','Alata',Arial,sans-serif; font-weight:900; font-size:48px; color:#EBFBE9; display:none;
   }
-  .hudhearts { position:absolute; top:30px; left:40px; display:flex; gap:8px; }
+  .hudhearts { position:absolute; top:30px; right:40px; display:flex; gap:8px; }
   .hudtimer {
-    position:absolute; top:10px; left:260px;
+    position:absolute; top:10px; right:260px;
     font-family:'Apotek','Alata',Arial,sans-serif; font-weight:700; font-size:48px;
-    color:#C9F2EE; line-height:60px;
+    color:#EBFBE9; line-height:60px;
   }
   .clicktocontinue {
     position:absolute; left:50%; bottom:40px; transform:translateX(-50%);
-    font-family:'Alata',Arial,sans-serif; font-size:32px; color:#EAF6FA; z-index:2;
+    font-family:'Alata',Arial,sans-serif; font-size:32px; color:#EBFBE9; z-index:2;
   }
+
+  /* above every other layer, but under the menu bar/button and the dropdown */
+  .warninglayer { position:absolute; top:0; left:0; width:1920px; height:1080px; z-index:490; pointer-events:none; display:none; }
 
   .creditwrap { position:absolute; top:95px; left:0; width:1920px; height:985px; overflow-y:auto; overflow-x:hidden; z-index:700; background:#021427; -webkit-overflow-scrolling:touch; }
   .creditimg { display:block; width:1920px; height:auto; }
@@ -55,6 +60,7 @@
       <div id="hudTimer" class="hudtimer">30</div>
     </div>
     <img id="menuBar" class="menubar" style="display:none;">
+    <div id="menuButton" class="menubutton" title="Menu"></div>
     <div id="navLabel" class="navlabel">HOME</div>
     <div id="menuDropdown" class="menudropdown" style="display:none;">
       <img id="menuDropdownImg" class="layer">
@@ -165,9 +171,10 @@ const FISH_SPEED = 110;
 const FISH_DEAD = 'fish_dead.png';
 const MAX_MISSES = 5;
 
-const FISH_COUNT = 18, TRASH_COUNT = 21;
+const FISH_COUNT = 18, TRASH_COUNT = 21, WARNING_COUNT = 13;
 const fishNames  = Array.from({length:FISH_COUNT},  (_,i)=>`fish_${String(i+1).padStart(2,'0')}.png`);
 const trashNames = Array.from({length:TRASH_COUNT}, (_,i)=>`trash_${String(i+1).padStart(2,'0')}.png`);
+const warningNames = Array.from({length:WARNING_COUNT}, (_,i)=>`warnings_${String(i+1).padStart(2,'0')}.png`);
 
 const SWIM_BOX = { left:360, right:STAGE_W-360, top:STAGE_H/2, bottom:STAGE_H-70 };
 const CORAL_RECTS = [
@@ -205,6 +212,7 @@ const hud = document.getElementById('hud');
 const hudHearts = document.getElementById('hudHearts');
 const hudTimer = document.getElementById('hudTimer');
 const menuBar = document.getElementById('menuBar');
+const menuButton = document.getElementById('menuButton');
 const navLabel = document.getElementById('navLabel');
 const menuDropdown = document.getElementById('menuDropdown');
 const menuDropdownImg = document.getElementById('menuDropdownImg');
@@ -231,11 +239,29 @@ function clearStage(){
   cleanupFns=[];
   timers.forEach(clearTimeout); timers=[];
   intervals.forEach(clearInterval); intervals=[];
-  [...stage.children].forEach(c=>{ if(c!==hud && c!==navLabel && c!==menuBar && c!==menuDropdown) c.remove(); });
+  [...stage.children].forEach(c=>{ if(c!==hud && c!==navLabel && c!==menuBar && c!==menuButton && c!==menuDropdown) c.remove(); });
   hud.style.display='none';
   navLabel.style.display='none';
   stage.onclick=null;
+  warningEl = null;
+  clearTimeout(warningTimer);
 }
+// ---------------- bottom-edge warning flash ----------------
+let warningEl = null, warningTimer = null;
+function triggerWarning(){
+  const name = warningNames[Math.floor(Math.random()*warningNames.length)];
+  if(!warningEl){
+    warningEl = document.createElement('img');
+    warningEl.className = 'warninglayer';
+    stage.appendChild(warningEl);
+  }
+  warningEl.src = IMG+name;
+  warningEl.style.display = 'block';
+  clearTimeout(warningTimer);
+  warningTimer = setTimeout(()=>{ if(warningEl) warningEl.style.display = 'none'; }, 1000);
+  timers.push(warningTimer);
+}
+
 function makeImg(src, cls){
   const el = document.createElement('img');
   el.src = src; el.className = cls || 'sprite'; el.draggable = false;
@@ -251,7 +277,7 @@ let creditWrapEl = null;
 let menuOpen = false;
 let lastMenuClickAt = 0; // debounce so a double-fired click doesn't flip state twice
 
-menuBar.addEventListener('click', e=>{
+menuButton.addEventListener('click', e=>{
   const now = Date.now();
   if(now - lastMenuClickAt < 150){ e.stopPropagation(); return; }
   lastMenuClickAt = now;
@@ -429,9 +455,12 @@ function showRandomize(){
   currentScene = 'randomize';
   clearStage();
   makeImg(IMG+'random_char_01.png','layer');
-  timers.push(setTimeout(startCharTwo, 1500));
+  const mystery = makeImg(IMG+'fish_mystery.png');
+  fitSlotFish(mystery, IMG+'fish_mystery.png');
+  timers.push(setTimeout(()=> startCharTwo(mystery), 1500));
 }
-function startCharTwo(){
+function startCharTwo(mystery){
+  mystery.remove();
   const bg = stage.querySelector('.layer');
   bg.src = IMG+'random_char_02.png';
   const src0 = IMG+fishNames[0];
@@ -606,8 +635,9 @@ function handleMiss(d, ch){
   ch.active.delete(d);
   playSound(sounds.wrong, 'wrong');
   ch.missCount++;
+  if(ch.missCount >= MAX_MISSES){ triggerLose(ch); return; }
+  triggerWarning();
   updateHud(ch);
-  if(ch.missCount > MAX_MISSES){ triggerLose(ch); return; }
   checkEnd(ch);
 }
 function checkEnd(ch){
@@ -626,12 +656,13 @@ function triggerLose(ch){
   ch.spawning = false;
   clearInterval(ch.countdown);
   hud.style.display = 'none';
+  if(warningEl){ warningEl.style.display = 'none'; clearTimeout(warningTimer); }
   ch.state.alive = false;
   const leftover = [...ch.active];
   leftover.forEach(d=> d.el.style.display = 'none');
   ch.fish.el.remove();
   const losePopup = makeImg(IMG+'lose.png','layer');
-  losePopup.style.zIndex = 100;
+  losePopup.style.zIndex = 495; // above the warning flash (490), below the menu bar (500)
   stopBackgroundMusic();
   playSound(sounds.youLose, 'youLose');
   timers.push(setTimeout(()=>{
@@ -647,17 +678,23 @@ function enterLoseScene(ch, leftover){
   const kept = leftover.slice(0, target);
   leftover.slice(target).forEach(d=> d.el.remove());
   const filler = Array.from({length: Math.max(0, target-kept.length)}, makeFillerPiece);
-  const deadFish = makeDeadFishPiece();
-  startFloatingTrash([...kept, ...filler, deadFish]);
+  const deadFish = pickDeadFishScales().map(makeDeadFishPiece);
+  startFloatingTrash([...kept, ...filler, ...deadFish]);
 }
 function makeFillerPiece(){
   const name = trashNames[Math.floor(Math.random()*trashNames.length)];
   const el = makeImg(IMG+name);
   return { el, src: IMG+name, scale: randRange(0.5, 1.6), angle: randRange(0, 360) };
 }
-function makeDeadFishPiece(){
+function makeDeadFishPiece(scale){
   const el = makeImg(IMG+FISH_DEAD);
-  return { el, src: IMG+FISH_DEAD, scale: 1, angle: 180 };
+  return { el, src: IMG+FISH_DEAD, scale, angle: 180 };
+}
+// 1-3 dead fish, sizes drawn without repeats from {full, 75%, 50%} so none match or sit near-identical
+const DEAD_FISH_SCALES = [1, 0.75, 0.5];
+function pickDeadFishScales(){
+  const count = 1 + Math.floor(Math.random()*3);
+  return [...DEAD_FISH_SCALES].sort(()=> Math.random()-0.5).slice(0, count);
 }
 function startFloatingTrash(items){
   const ref = { alive:true };
@@ -711,10 +748,11 @@ function triggerWin(ch){
   ch.active.forEach(d=> d.el.remove());
   ch.active.clear();
   hud.style.display = 'none';
+  if(warningEl){ warningEl.style.display = 'none'; clearTimeout(warningTimer); }
   ch.state.alive = false;
   ch.fish.el.remove();
   const winPopup = makeImg(IMG+'win.png','layer');
-  winPopup.style.zIndex = 100;
+  winPopup.style.zIndex = 495; // above the warning flash (490), below the menu bar (500)
   stopBackgroundMusic();
   playSound(sounds.youWin, 'youWin');
   timers.push(setTimeout(()=>{
@@ -738,12 +776,17 @@ function spawnWinFish(src){
   cleanupFns.push(() => { ref.alive = false; });
   requestAnimationFrame(t => winLoop(fishes, ref, t));
 }
-// spread sizes across a moderate range instead of pure random
+// spread sizes across a moderate range, forced apart so no two fish are the same size (or close to it)
 function winFishScales(count){
-  const arr = [];
+  const minGap = 0.08;
+  let arr = [];
   for(let i=0;i<count;i++){
     const t = count>1 ? i/(count-1) : 0.5;
-    arr.push(0.55 + t*(1.1-0.55) + randRange(-0.06,0.06));
+    arr.push(0.55 + t*(1.1-0.55) + randRange(-0.02,0.02));
+  }
+  arr.sort((a,b)=> a-b);
+  for(let i=1;i<arr.length;i++){
+    if(arr[i]-arr[i-1] < minGap) arr[i] = arr[i-1]+minGap;
   }
   return arr.sort(()=> Math.random()-0.5);
 }
@@ -829,8 +872,8 @@ const ALL_ASSETS = [
   'game_start.png','home.png','menu_bar.png','menu_drop_down.png','credit.png',
   'random_char_01.png','random_char_02.png',
   'game_background.png','game_background_lose.png','lose.png',
-  'instruction_pop-up.png','win.png','game_background_win.png', FISH_DEAD,
-  ...fishNames, ...trashNames
+  'instruction_pop-up.png','win.png','game_background_win.png', FISH_DEAD, 'fish_mystery.png',
+  ...fishNames, ...trashNames, ...warningNames
 ].map(n=> IMG+n);
 
 fitStage();
