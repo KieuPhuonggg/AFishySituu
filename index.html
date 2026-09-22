@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Mr. Bartholomew Fishington's Ocean Cleanup</title>
+<title>A Fishy Situation</title>
 <style>
   html, body { margin:0; padding:0; height:100%; overflow:hidden; background:#021427; }
   #viewport {width:100%; height:100%; display:flex; align-items:center; justify-content:center; }
@@ -50,6 +50,18 @@
     font-family:'Alata', Arial,sans-serif; font-weight:700; font-size:40px; color:#cfe9ff;
   }
   img { display:block; }
+
+  /* shown instead of the stage when a phone is held upright - the game stays 16:9 landscape only */
+  #rotatePrompt {
+    position:fixed; top:0; left:0; width:100%; height:100%; z-index:9999;
+    display:none; align-items:center; justify-content:center; flex-direction:column;
+    background:#021427; color:#EBFBE9; text-align:center; padding:40px; box-sizing:border-box;
+    font-family:'Alata', Arial,sans-serif;
+  }
+  #rotatePrompt.show { display:flex; }
+  #rotatePrompt .icon { font-size:64px; margin-bottom:20px; animation: rotateHint 1.6s ease-in-out infinite; }
+  #rotatePrompt p { font-size:22px; max-width:360px; margin:0; }
+  @keyframes rotateHint { 0%,100%{ transform:rotate(0deg); } 50%{ transform:rotate(90deg); } }
 </style>
 </head>
 <body>
@@ -70,6 +82,10 @@
     </div>
     <div id="loading">Loading...</div>
   </div>
+</div>
+<div id="rotatePrompt">
+  <div class="icon">📱</div>
+  <p>Please rotate your device to landscape to play A Fishy Situation.</p>
 </div>
 
 <script>
@@ -219,16 +235,22 @@ const menuDropdownImg = document.getElementById('menuDropdownImg');
 const homeHotspot = document.getElementById('homeHotspot');
 const gameHotspot = document.getElementById('gameHotspot');
 const creditHotspot = document.getElementById('creditHotspot');
+const viewport = document.getElementById('viewport');
+const rotatePrompt = document.getElementById('rotatePrompt');
 
+// stage stays fixed 16:9 landscape - portrait devices get a "please rotate" screen instead of an auto-rotated stage
 function fitStage(){
   const vw = window.innerWidth, vh = window.innerHeight;
   const portrait = vw < vh;
-  const scale = portrait
-    ? Math.min(vw / STAGE_H, vh / STAGE_W)
-    : Math.min(vw / STAGE_W, vh / STAGE_H);
-  stage.style.transform = portrait
-    ? `rotate(90deg) scale(${scale})`
-    : `scale(${scale})`;
+  if(portrait){
+    rotatePrompt.classList.add('show');
+    viewport.style.visibility = 'hidden';
+    return;
+  }
+  rotatePrompt.classList.remove('show');
+  viewport.style.visibility = 'visible';
+  const scale = Math.min(vw / STAGE_W, vh / STAGE_H);
+  stage.style.transform = `scale(${scale})`;
 }
 window.addEventListener('resize', fitStage);
 window.addEventListener('orientationchange', ()=> setTimeout(fitStage, 50));
